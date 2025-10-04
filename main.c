@@ -5,98 +5,71 @@
 #include <string.h>
 #include <complex.h>
 #include <math.h>
+#include <dlfcn.h>
+#include "plug.h"
 
 #define ARRAY_LEN(xs) sizeof(xs)/sizeof(xs[0])
-#define N 256
 
-float in[N];
-float pi;
-float complex out[N];
-float max_amp;
 typedef struct{
 	float left;
 	float right;
 } Frame;
 
 
-float amp(float complex z){
-	float a = fabsf(crealf(z));
-	float b = fabsf(cimagf(z));
-	if(a<b) return b;
-	return a; 	
-}
 
 
 
-void fft(float in[], size_t stride, float complex out[],size_t n){
-	if(n==1){
-		out[0] = in[0];
-		return;
+
+const char *libplug_file_name = "libplug.so";
+void *libplug = NULL;
+plug_hello_t plug_hello = NULL;
+plug_init_t plug_init = NULL;
+plug_update_t plug_update = NULL;
+Plug plug = {0};
+bool reload_libplug(void){
+	if(libplug != NULL)  dlclose(libplug);
+	libplug = dlopen(libplug_file_name, RTLD_NOW);
+	if(libplug == NULL){
+		fprintf(stderr , "ERR : could not load %s : %s" , libplug_file_name, dlerror());
+		return false;
 	}
-	fft(in,stride*2,out,n/2);
-	fft(in +stride, stride*2,out +n/2,n/2);
-	for(size_t k=0;k<n/2;k++){
-		float t = (float)k/n;
-		float complex v = cexp(-2*I*pi*t)*out[k+n/2];
-		float complex e = out[k];
-		out[k] = e+v;
-		out[k+n/2] = e-v;
+	plug_hello = dlsym(libplug, "plug_hello");
+	if(plug_hello == NULL){
+		fprintf(stderr, "Couldn't find plug_hello symbol in %s : %s" , libplug_file_name, dlerror());
+		return false;
 	}
-}
-
-void callback(void *bufferdata, unsigned int frames){
-	if(frames < N) return;
-
-	Frame *fs = bufferdata;
-	for(size_t i=0;i<N;i++){
-		in[i] = fs[i].left;
+	plug_init = dlsym(libplug, "plug_init");
+	if(plug_init == NULL){
+		fprintf(stderr, "Couldn't find plug_init symbol in %s : %s" , libplug_file_name, dlerror());
+		return false;
 	}
-	fft(in,1,out,N); 
-	max_amp = 0.0f;
-	for(size_t i=0;i<N;i++){
-		float a = amp(out[i]); 
-		if(max_amp < a) max_amp = a;
+	plug_update = dlsym(libplug, "plug_update");
+	if(plug_update == NULL){
+		fprintf(stderr, "Couldn't find plug_update symbol in %s : %s" , libplug_file_name, dlerror());
+		return false;
 	}
+	return true;		
 }
 
 int main(void)
-
 {
-	pi = atan2f(1,1)*4;
+
+	
+	if(!reload_libplug()) return 1;
+	
+	plug_hello();
+
 	InitWindow(800,600,"Musializer");
-	SetTargetFPS(60);
-
+	SetTargetFPS(300);
 	InitAudioDevice();
-	Music music =LoadMusicStream("The_Weeknd_ft_Playboi_Carti_-_Timeless.mp3");
-	PlayMusicStream(music);
+	
 
-	AttachAudioStreamProcessor(music.stream, callback);
-
+	plug_init(&plug);
 	while(!WindowShouldClose()){
-		UpdateMusicStream(music);
-
-		if(IsKeyPressed(KEY_SPACE)){
-			if(IsMusicStreamPlaying(music)){
-				PauseMusicStream(music);
-			}else{
-				ResumeMusicStream(music);
-			}
+		if(IsKeyPressed(KEY_R)){
+			if(!reload_libplug()) return 1;
 		}
-
-		int w = GetRenderWidth();
-		int h = GetRenderHeight();
-
-		BeginDrawing();
-		ClearBackground(BLACK);
-		float cellWidth = (float)w/N;
-
-		// drawing one frame of a signal
-		for(size_t i = 0;i<N;i++){
-				float t = amp(out[i])/max_amp;
-				DrawRectangle(i*cellWidth,h/2-h/2*t,1,h/2*t,RED);
-			
-		}
-		EndDrawing();
+		plug_update(&plug);
 	}
 	
     return 0;
