@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <assert.h>
 #include <math.h>
 #include "plug.h"
-
+#include <string.h>
+#define N (1<<13)
 
 typedef struct{
 	float left;
@@ -11,11 +13,12 @@ typedef struct{
 float in[N];
 float complex out[N];
 void callback(void *bufferdata, unsigned int frames){
-	if(frames < N) return;
+	if(frames > N) frames = N;
 
 	Frame *fs = bufferdata;
-	for(size_t i=0;i<N;i++){
-		in[i] = fs[i].left;
+	for(size_t i=0;i<frames;i++){
+		memmove(in , in+1 , (N-1)*sizeof(in[0]));
+		in[N-1] = fs[i].left;
 	}
 	
 }
@@ -26,6 +29,7 @@ Color get_random_color(){
 	
 }
 void fft(float in[], size_t stride, float complex out[],size_t n){
+	assert(n > 0);
 	if(n==1){
 		out[0] = in[0];
 		return;
@@ -53,12 +57,21 @@ void plug_hello(void){
 
  void plug_init(Plug *plug){
 
- 	plug->music =LoadMusicStream("The_Weeknd_ft_Playboi_Carti_-_Timeless.mp3");
+ 	plug->music =LoadMusicStream("../Travis_Scott_-_HIGHEST_IN_THE_ROOM_(mp3.pm).mp3");
  	PlayMusicStream(plug->music);
  	
  	AttachAudioStreamProcessor(plug->music.stream, callback);
  	
  }
+
+
+void  plug_pre_reload(Plug *plug){
+	DetachAudioStreamProcessor(plug->music.stream, callback);
+}
+void plug_post_reload(Plug *plug){
+	AttachAudioStreamProcessor(plug->music.stream, callback);
+}
+ 
  void plug_update(Plug *plug){
  	UpdateMusicStream(plug->music);
 
@@ -81,14 +94,37 @@ void plug_hello(void){
 				float a = amp(out[i]); 
 				if(max_amp < a) max_amp = a;
 			}
-		float cellWidth = (float)w/N;
+		//float cellWidth = 2; 
 
+		float step = 1.06;
+		    size_t m = 0;
+		    for (float f = 20.0f; (size_t) f < N; f *= step) {
+		        m += 1;
+		    }
+		
+		    float cell_width = (float)w/m;
+		    m = 0;
+		    for (float f = 20.0f; (size_t) f < N; f *= step) {
+		        float f1 = f*step;
+		        float a = 0.0f;
+		        for (size_t q = (size_t) f; q < N && q < (size_t) f1; ++q) {
+		            a += amp(out[q]);
+		        }
+		        a /= (size_t) f1 - (size_t) f + 1;
+		        float t = a/max_amp;
+		        DrawRectangle(m*cell_width, h/2 - h/2*t, cell_width, h/2*t, WHITE);
+		        m += 1;
+		    }
+	/*	float cellWidth =  (float)w/N;
+		printf("%f" , cellWidth);
 		// drawing one frame of a signal
-		for(size_t i = 0;i<N;i++){
+		for(int i = 0;i<N;i++){
 				float t = amp(out[i])/max_amp;
-				DrawRectangle(i*cellWidth,h/2-h/2*t,1,h/2*t,get_random_color());
+				//Color c = ColorAlphaBlend(RED , ColorAlpha(GREEN , t) , WHITE);
+				DrawRectangle(i*ceil(cellWidth),h/2-h/2*t,ceil(cellWidth),h/2*t,get_random_color());
 			
 		}
-		EndDrawing();
+		*/
+		EndDrawing(); 
  	
  }

@@ -25,6 +25,8 @@ void *libplug = NULL;
 plug_hello_t plug_hello = NULL;
 plug_init_t plug_init = NULL;
 plug_update_t plug_update = NULL;
+plug_pre_reload_t plug_pre_reload = NULL;
+plug_post_reload_t plug_post_reload = NULL;
 Plug plug = {0};
 bool reload_libplug(void){
 	if(libplug != NULL)  dlclose(libplug);
@@ -48,6 +50,16 @@ bool reload_libplug(void){
 		fprintf(stderr, "Couldn't find plug_update symbol in %s : %s" , libplug_file_name, dlerror());
 		return false;
 	}
+	plug_pre_reload = dlsym(libplug, "plug_pre_reload");
+		if(plug_pre_reload == NULL){
+			fprintf(stderr, "Couldn't find plug_pre_reload symbol in %s : %s" , libplug_file_name, dlerror());
+			return false;
+		}
+	plug_post_reload = dlsym(libplug, "plug_post_reload");
+		if(plug_post_reload == NULL){
+			fprintf(stderr, "Couldn't find plug_post_reload symbol in %s : %s" , libplug_file_name, dlerror());
+			return false;
+		}
 	return true;		
 }
 
@@ -59,15 +71,17 @@ int main(void)
 	
 	plug_hello();
 
-	InitWindow(800,600,"Musializer");
-	SetTargetFPS(300);
+	InitWindow(1200,900,"Musializer");
+	SetTargetFPS(60);
 	InitAudioDevice();
 	
 
 	plug_init(&plug);
 	while(!WindowShouldClose()){
 		if(IsKeyPressed(KEY_R)){
-			if(!reload_libplug()) return 1;
+			plug_pre_reload(&plug);
+				if(!reload_libplug()) return 1;
+			plug_post_reload(&plug);	
 		}
 		plug_update(&plug);
 	}
