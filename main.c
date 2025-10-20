@@ -22,12 +22,22 @@ typedef struct{
 
 const char *libplug_file_name = "libplug.so";
 void *libplug = NULL;
-plug_hello_t plug_hello = NULL;
-plug_init_t plug_init = NULL;
-plug_update_t plug_update = NULL;
-plug_pre_reload_t plug_pre_reload = NULL;
-plug_post_reload_t plug_post_reload = NULL;
+
+
+// X Macros
+#define PLUG(name) name##_t name;
+LIST_OF_PLUGS
+#undef PLUG
+// Used X Macros to define these (pointers to functions) 
+// plug_hello_t plug_hello = NULL;
+// plug_init_t plug_init = NULL;
+// plug_update_t plug_update = NULL;
+// plug_pre_reload_t plug_pre_reload = NULL;
+// plug_post_reload_t plug_post_reload = NULL;
+
+
 Plug plug = {0};
+
 bool reload_libplug(void){
 	if(libplug != NULL)  dlclose(libplug);
 	libplug = dlopen(libplug_file_name, RTLD_NOW);
@@ -35,7 +45,20 @@ bool reload_libplug(void){
 		fprintf(stderr , "ERR : could not load %s : %s" , libplug_file_name, dlerror());
 		return false;
 	}
-	plug_hello = dlsym(libplug, "plug_hello");
+
+	// Used X macros to define functions
+	
+	#define PLUG(name) \
+	name = dlsym(libplug , #name); \
+	if(name == NULL){ \
+			fprintf(stderr, "Couldn't find %s symbol in %s : %s" , #name , libplug_file_name, dlerror()); \
+			return false; \
+	}
+	LIST_OF_PLUGS
+	#undef PLUG
+		
+	//////////////////////////////
+/*	plug_hello = dlsym(libplug, "plug_hello");
 	if(plug_hello == NULL){
 		fprintf(stderr, "Couldn't find plug_hello symbol in %s : %s" , libplug_file_name, dlerror());
 		return false;
@@ -60,6 +83,7 @@ bool reload_libplug(void){
 			fprintf(stderr, "Couldn't find plug_post_reload symbol in %s : %s" , libplug_file_name, dlerror());
 			return false;
 		}
+*/
 	return true;		
 }
 

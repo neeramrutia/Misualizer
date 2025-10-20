@@ -112,7 +112,7 @@ void plug_post_reload(Plug *plug){
 		        }
 		        a /= (size_t) f1 - (size_t) f + 1;
 		        float t = a/max_amp;
-		        DrawRectangle(m*cell_width, h/2 - h/2*t, cell_width, h/2*t, WHITE);
+		        DrawRectangle(m*cell_width, h/2 - h/2*t, cell_width, h/2*t, BROWN);
 		        m += 1;
 		    }
 	/*	float cellWidth =  (float)w/N;
